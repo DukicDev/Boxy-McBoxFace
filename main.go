@@ -4,6 +4,9 @@ import (
 	"os"
 	"os/exec"
 	"syscall"
+
+	"github.com/containerd/cgroups/v3/cgroup1"
+	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
 func main() {
@@ -41,6 +44,8 @@ func child() {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
+	cg()
+
 	err := syscall.Sethostname([]byte("Boxy-McBoxFace"))
 	if err != nil {
 		panic(err)
@@ -60,6 +65,33 @@ func child() {
 
 	err = cmd.Run()
 	if err != nil {
+		panic(err)
+	}
+
+}
+
+func cg() {
+	shares := uint64(50)
+	memLimit := int64(100 * 1024 * 1024)
+
+	cg, err := cgroup1.New(cgroup1.StaticPath("/boxy-mcboxface"), &specs.LinuxResources{
+		CPU: &specs.LinuxCPU{
+			Shares: &shares,
+		},
+		Memory: &specs.LinuxMemory{
+			Limit: &memLimit,
+		},
+		Pids: &specs.LinuxPids{
+			Limit: int64(20),
+		},
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	pid := os.Getpid()
+
+	if err := cg.Add(cgroup1.Process{Pid: pid}); err != nil {
 		panic(err)
 	}
 
