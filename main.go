@@ -12,11 +12,15 @@ func main() {
 	switch cmd {
 	case "run":
 		run()
+	case "child":
+		child()
+	default:
+		panic("Bruh")
 	}
 }
 
 func run() {
-	cmd := exec.Command(os.Args[2], os.Args[3:]...)
+	cmd := exec.Command("/proc/self/exe", append([]string{"child"}, os.Args[2:]...)...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -41,6 +45,23 @@ func run() {
 	}
 
 	err := cmd.Run()
+	if err != nil {
+		panic(err)
+	}
+}
+
+func child() {
+	cmd := exec.Command(os.Args[2], os.Args[3:]...)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	err := syscall.Sethostname([]byte("Boxy-McBoxFace"))
+	if err != nil {
+		panic(err)
+	}
+
+	err = cmd.Run()
 	if err != nil {
 		panic(err)
 	}
