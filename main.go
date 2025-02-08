@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"syscall"
@@ -10,7 +11,14 @@ import (
 )
 
 func main() {
+	fmt.Println(os.Args)
 	cmd := os.Args[1]
+	image := os.Args[2]
+
+	if image != "alpine" {
+		fmt.Println("Sorry, i only know alpine")
+		return
+	}
 
 	switch cmd {
 	case "run":
@@ -18,11 +26,14 @@ func main() {
 
 	case "child":
 		child()
+
+	default:
+		panic("No command -> No Boxy-McBoxFace!!1111!!!!")
 	}
 }
 
 func run() {
-	cmd := exec.Command("/proc/self/exe", "child")
+	cmd := exec.Command("/proc/self/exe", append([]string{"child"}, os.Args[2:]...)...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -39,7 +50,7 @@ func run() {
 }
 
 func child() {
-	cmd := exec.Command("/bin/bash")
+	cmd := exec.Command(os.Args[3], os.Args[4:]...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -51,17 +62,22 @@ func child() {
 		panic(err)
 	}
 
-	err = os.Chdir("/")
-	if err != nil {
-		panic(err)
-	}
-
-	err = syscall.Mount("proc", "proc", "proc", 0, "")
+	err = syscall.Mount("proc", "./images/alpine/layer/proc", "proc", 0, "")
 	if err != nil {
 		panic(err)
 	}
 
 	defer syscall.Unmount("proc", 0)
+
+	err = syscall.Chroot("./images/alpine/layer/")
+	if err != nil {
+		panic(err)
+	}
+
+	err = os.Chdir("./images/alpine/layer/home/")
+	if err != nil {
+		panic(err)
+	}
 
 	err = cmd.Run()
 	if err != nil {
