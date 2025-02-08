@@ -10,15 +10,10 @@ import (
 	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
-func main() {
-	fmt.Println(os.Args)
-	cmd := os.Args[1]
-	image := os.Args[2]
+var destDir = "./boxy-mcboxface/alpine"
 
-	if image != "alpine" {
-		fmt.Println("Sorry, i only know alpine")
-		return
-	}
+func main() {
+	cmd := os.Args[1]
 
 	switch cmd {
 	case "run":
@@ -47,34 +42,50 @@ func run() {
 	if err != nil {
 		panic(err)
 	}
+	os.RemoveAll(destDir)
 }
 
 func child() {
-	cmd := exec.Command(os.Args[3], os.Args[4:]...)
+	image := os.Args[2]
+
+	if image != "alpine" {
+		fmt.Println("Sorry, i only know alpine")
+		return
+	}
+	err := os.MkdirAll(destDir, 0755)
+	if err != nil {
+		panic(err)
+	}
+	imageCmd, err := ExtractImage("alpine")
+	if err != nil {
+		panic(err)
+	}
+
+	cmd := exec.Command(imageCmd[0])
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
 	cg()
 
-	err := syscall.Sethostname([]byte("Boxy-McBoxFace"))
+	err = syscall.Sethostname([]byte("Boxy-McBoxFace"))
 	if err != nil {
 		panic(err)
 	}
 
-	err = syscall.Mount("proc", "./images/alpine/layer/proc", "proc", 0, "")
+	err = syscall.Mount("proc", destDir+"/proc", "proc", 0, "")
 	if err != nil {
 		panic(err)
 	}
 
 	defer syscall.Unmount("proc", 0)
 
-	err = syscall.Chroot("./images/alpine/layer/")
+	err = syscall.Chroot(destDir)
 	if err != nil {
 		panic(err)
 	}
 
-	err = os.Chdir("./images/alpine/layer/home/")
+	err = os.Chdir("/home")
 	if err != nil {
 		panic(err)
 	}
@@ -83,7 +94,6 @@ func child() {
 	if err != nil {
 		panic(err)
 	}
-
 }
 
 func cg() {
