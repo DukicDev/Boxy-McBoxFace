@@ -1,5 +1,8 @@
 # Boxy-McBoxFace
 
+[![Go Version](https://img.shields.io/github/go-mod/go-version/DukicDev/godoist)](https://golang.org/)  
+[![License](https://img.shields.io/github/license/DukicDev/godoist)](LICENSE)
+
 Boxy-McBoxFace is a hobby project written in Go that explores containerization, OCI images, and Linux isolation techniques. It’s a minimal container runtime that currently supports only Alpine Linux. 
 
 ## Overview
