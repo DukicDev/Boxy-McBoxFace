@@ -1,7 +1,8 @@
 package main
 
 import (
-	"fmt"
+	"errors"
+	"io/fs"
 	"os"
 	"os/exec"
 	"syscall"
@@ -10,7 +11,7 @@ import (
 	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
-var destDir = "./boxy-mcboxface/alpine"
+var baseDir = "./boxy-mcboxface/"
 
 func main() {
 	cmd := os.Args[1]
@@ -42,21 +43,20 @@ func run() {
 	if err != nil {
 		panic(err)
 	}
-	os.RemoveAll(destDir)
+
+	image := os.Args[2]
+	os.RemoveAll(baseDir + image)
 }
 
 func child() {
 	image := os.Args[2]
+	destDir := baseDir + image
 
-	if image != "alpine" {
-		fmt.Println("Sorry, i only know alpine")
-		return
-	}
 	err := os.MkdirAll(destDir, 0755)
 	if err != nil {
 		panic(err)
 	}
-	imageCmd, err := ExtractImage("alpine")
+	imageCmd, err := ExtractImage(image)
 	if err != nil {
 		panic(err)
 	}
@@ -74,7 +74,7 @@ func child() {
 	}
 
 	err = syscall.Mount("proc", destDir+"/proc", "proc", 0, "")
-	if err != nil {
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		panic(err)
 	}
 
@@ -85,10 +85,17 @@ func child() {
 		panic(err)
 	}
 
-	err = os.Chdir("/home")
+	err = os.Chdir("/")
 	if err != nil {
 		panic(err)
 	}
+
+	os.Setenv("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin")
+	cmdPath, err := exec.LookPath(imageCmd[0])
+	if err != nil {
+		panic(err)
+	}
+	cmd.Path = cmdPath
 
 	err = cmd.Run()
 	if err != nil {

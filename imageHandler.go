@@ -115,13 +115,15 @@ func untarLayer(layerBytes []byte, destDir string) {
 			if err != nil {
 				panic(err)
 			}
+
+		case tar.TypeLink:
+			err = os.Link(filepath.Join(destDir, header.Linkname), target)
+			if err != nil {
+				panic(err)
+			}
 		default:
 			fmt.Printf("Skipping unsupported type: %c in file %s\n", header.Typeflag, header.Name)
 		}
-	}
-	err = os.Chmod("./boxy-mcboxface/alpine/bin/busybox", 0755)
-	if err != nil {
-		panic(err)
 	}
 }
 
