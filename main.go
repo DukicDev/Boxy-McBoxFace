@@ -56,12 +56,12 @@ func child() {
 	if err != nil {
 		panic(err)
 	}
-	imageCmd, err := ExtractImage(image)
+	imageConfig, err := ExtractImage(image)
 	if err != nil {
 		panic(err)
 	}
-
-	cmd := exec.Command(imageCmd[0])
+	imageCmd := getImageCmd(imageConfig)
+	cmd := exec.Command(imageCmd[0], imageCmd[1:]...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -69,11 +69,13 @@ func child() {
 	cg()
 
 	err = syscall.Sethostname([]byte("Boxy-McBoxFace"))
+
 	if err != nil {
 		panic(err)
 	}
 
 	err = syscall.Mount("proc", destDir+"/proc", "proc", 0, "")
+
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		panic(err)
 	}
@@ -81,11 +83,20 @@ func child() {
 	defer syscall.Unmount("proc", 0)
 
 	err = syscall.Chroot(destDir)
+
 	if err != nil {
 		panic(err)
 	}
 
-	err = os.Chdir("/")
+	var workDir string
+	if imageConfig.WorkingDir == "" {
+		workDir = "/"
+	} else {
+		workDir = imageConfig.WorkingDir
+	}
+
+	err = os.Chdir(workDir)
+
 	if err != nil {
 		panic(err)
 	}
@@ -95,9 +106,11 @@ func child() {
 	if err != nil {
 		panic(err)
 	}
+
 	cmd.Path = cmdPath
 
 	err = cmd.Run()
+
 	if err != nil {
 		panic(err)
 	}
@@ -128,4 +141,14 @@ func cg() {
 		panic(err)
 	}
 
+}
+
+func getImageCmd(imageConfig Config) []string {
+	var cmd []string
+	if len(imageConfig.Entrypoint) > 0 {
+		cmd = append(imageConfig.Entrypoint, imageConfig.Cmd...)
+	} else {
+		cmd = imageConfig.Cmd
+	}
+	return cmd
 }

@@ -18,13 +18,16 @@ type Manifest struct {
 }
 
 type ImageConfig struct {
-	Config struct {
-		Entrypoint []string `json:"Entrypoint"`
-		Cmd        []string `json:"Cmd"`
-	} `json:"Config"`
+	Config Config `json:"Config"`
 }
 
-func ExtractImage(imageName string) ([]string, error) {
+type Config struct {
+	Entrypoint []string `json:"Entrypoint"`
+	Cmd        []string `json:"Cmd"`
+	WorkingDir string   `json:"WorkingDir"`
+}
+
+func ExtractImage(imageName string) (Config, error) {
 	tarPath := "./images/" + imageName + ".tar"
 
 	manifestBytes, err := extractFile(tarPath, "manifest.json")
@@ -50,12 +53,6 @@ func ExtractImage(imageName string) ([]string, error) {
 	if err != nil {
 		panic(err)
 	}
-	var cmd []string
-	if len(imageConfig.Config.Entrypoint) > 0 {
-		cmd = append(imageConfig.Config.Entrypoint, imageConfig.Config.Cmd...)
-	} else {
-		cmd = imageConfig.Config.Cmd
-	}
 
 	layerBytes, err := extractFile(tarPath, manifest.Layers[0])
 	if err != nil {
@@ -64,7 +61,7 @@ func ExtractImage(imageName string) ([]string, error) {
 	destDir := "./boxy-mcboxface/" + imageName
 	untarLayer(layerBytes, destDir)
 
-	return cmd, nil
+	return imageConfig.Config, nil
 }
 
 func untarLayer(layerBytes []byte, destDir string) {
