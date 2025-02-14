@@ -122,6 +122,27 @@ func untarLayer(layerBytes []byte, destDir string) {
 			fmt.Printf("Skipping unsupported type: %c in file %s\n", header.Typeflag, header.Name)
 		}
 	}
+
+	resolveConf, err := os.OpenFile(filepath.Join(destDir, "etc/resolv.conf"), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	if err != nil {
+		fmt.Printf("Couldnt create /etc/resolv.conf\n")
+		return
+	}
+	defer resolveConf.Close()
+
+	in, err := os.Open("/etc/resolv.conf")
+	if err != nil {
+		fmt.Printf("Couldnt read host resolv.conf\n")
+		return
+	}
+	defer in.Close()
+
+	_, err = io.Copy(resolveConf, in)
+	if err != nil {
+		fmt.Printf("Couldnt copy contents of %v to %v\n", in, resolveConf)
+		return
+	}
+
 }
 
 func extractFile(path string, target string) ([]byte, error) {
