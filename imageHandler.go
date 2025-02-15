@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 )
 
 type FatManifests struct {
@@ -39,6 +40,16 @@ type Config struct {
 	Entrypoint []string `json:"Entrypoint"`
 	Cmd        []string `json:"Cmd"`
 	WorkingDir string   `json:"WorkingDir"`
+	Env        []string `json:"Env"`
+}
+
+func (c *Config) getEnvMap() map[string]string {
+	envMap := make(map[string]string)
+	for _, env := range c.Env {
+		parts := strings.SplitN(env, "=", 2)
+		envMap[parts[0]] = parts[1]
+	}
+	return envMap
 }
 
 type TokenResp struct {
@@ -100,30 +111,43 @@ func pullImage(imageName string, tag string) (Config, error) {
 		return Config{}, err
 	}
 
-	fmt.Printf("Got WorkingDir: %s, Entrypoint: %s, Cmd: %s\n", config.Config.WorkingDir, config.Config.Entrypoint, config.Config.Cmd)
-
-	req.URL.Path = registryBaseUrl + imageName + "/blobs/" + manifest.Layers[0].Digest
-	resp, err = client.Do(req)
-	if err != nil {
-		return Config{}, err
-	}
-	defer resp.Body.Close()
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return Config{}, err
-	}
-	destDir := "./boxy-mcboxface/" + imageName
+	destDir := "/var/lib/boxy-mcboxface/containers/" + imageName
 	err = os.MkdirAll(destDir, 0755)
 	if err != nil {
 		return Config{}, err
 	}
 
-	untarLayer(bodyBytes, destDir)
+	for _, layer := range manifest.Layers {
+		var layerBytes []byte
+		if layerBytes, err = os.ReadFile("/var/lib/boxy-mcboxface/layers/" + layer.Digest); err != nil {
+			fmt.Printf("Pulling and extracting Layer %.16s...\n", strings.TrimPrefix(layer.Digest, "sha256:"))
+			req.URL.Path = registryBaseUrl + imageName + "/blobs/" + layer.Digest
+			resp, err = client.Do(req)
+			if err != nil {
+				return Config{}, err
+			}
+			defer resp.Body.Close()
+			layerBytes, err = io.ReadAll(resp.Body)
+			if err != nil {
+				return Config{}, err
+			}
+
+			if err := os.MkdirAll("/var/lib/boxy-mcboxface/layers", 0700); err != nil {
+				fmt.Printf("Could not create layers directory: Error: %s\n", err)
+			}
+			if err := os.WriteFile("/var/lib/boxy-mcboxface/layers/"+layer.Digest, layerBytes, 0700); err != nil {
+				fmt.Printf("Could not cache layer %.16s\nError: %s\n", strings.TrimPrefix(layer.Digest, "sha256:"), err)
+			}
+		} else {
+			fmt.Printf("Extracting cached Layer %.16s...\n", strings.TrimPrefix(layer.Digest, "sha256:"))
+		}
+		untarLayer(layerBytes, destDir)
+	}
+
 	return config.Config, nil
 }
 
 func getAuthToken(imageName string) string {
-	fmt.Printf("Getting Bearer Token for %s\n", imageName)
 	resp, err := http.Get("https://auth.docker.io/token?service=registry.docker.io&scope=repository:library/" + imageName + ":pull")
 	if err != nil {
 		panic(err)
@@ -137,7 +161,6 @@ func getAuthToken(imageName string) string {
 }
 
 func untarLayer(layerBytes []byte, destDir string) {
-	fmt.Printf("Extracting Image into %s\n", destDir)
 	byteReader := bytes.NewReader(layerBytes)
 	gzip, err := gzip.NewReader(byteReader)
 	if err != nil {

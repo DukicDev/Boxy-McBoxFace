@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -11,7 +12,7 @@ import (
 	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
-var baseDir = "./boxy-mcboxface/"
+var baseDir = "/var/lib/boxy-mcboxface/containers/"
 
 func main() {
 	cmd := os.Args[1]
@@ -29,6 +30,8 @@ func main() {
 }
 
 func run() {
+	image := os.Args[2]
+
 	cmd := exec.Command("/proc/self/exe", append([]string{"child"}, os.Args[2:]...)...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
@@ -41,10 +44,10 @@ func run() {
 
 	err := cmd.Run()
 	if err != nil {
+		os.RemoveAll(baseDir + image)
 		panic(err)
 	}
 
-	image := os.Args[2]
 	os.RemoveAll(baseDir + image)
 }
 
@@ -97,14 +100,25 @@ func child() {
 		panic(err)
 	}
 
-	os.Setenv("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin")
-	cmdPath, err := exec.LookPath(imageCmd[0])
+	for key, env := range imageConfig.getEnvMap() {
+		os.Setenv(key, env)
+	}
+
+	var cmdPath string
+	if len(os.Args) >= 4 {
+		imageCmd = os.Args[3:]
+	}
+	cmdPath, err = exec.LookPath(imageCmd[0])
 	if err != nil {
 		panic(err)
 	}
 
 	cmd.Path = cmdPath
+	if len(imageCmd) >= 2 {
+		cmd.Args = imageCmd
+	}
 
+	fmt.Printf("\nBoxy-McBoxFace running %s with cmd: %s\n\n", image, imageCmd)
 	err = cmd.Run()
 
 	if err != nil {
