@@ -113,7 +113,7 @@ func pullImage(imageName string, tag string) (Config, error) {
 		return Config{}, err
 	}
 	destDir := "./boxy-mcboxface/" + imageName
-	err = os.Mkdir(destDir, 0755)
+	err = os.MkdirAll(destDir, 0755)
 	if err != nil {
 		return Config{}, err
 	}
