@@ -7,18 +7,32 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 )
 
+type FatManifests struct {
+	Manifests []struct {
+		Annotations struct {
+			Arch string `json:"com.docker.official-images.bashbrew.arch"`
+		} `json:"annotations"`
+		Digest string `json:"digest"`
+	} `json:"manifests"`
+}
+
 type Manifest struct {
-	Config   string   `json:"Config"`
-	RepoTags []string `json:"RepoTags"`
-	Layers   []string `json:"Layers"`
+	Config struct {
+		Digest string `json:"digest"`
+	} `json:"Config"`
+	Layers []struct {
+		Digest string `json:"digest"`
+	} `json:"Layers"`
 }
 
 type ImageConfig struct {
-	Config Config `json:"Config"`
+	Config Config `json:"config"`
 }
 
 type Config struct {
@@ -27,44 +41,103 @@ type Config struct {
 	WorkingDir string   `json:"WorkingDir"`
 }
 
-func ExtractImage(imageName string) (Config, error) {
-	tarPath := "./images/" + imageName + ".tar"
+type TokenResp struct {
+	Token string `json:"token"`
+}
 
-	manifestBytes, err := extractFile(tarPath, "manifest.json")
-	if err != nil {
-		panic(err)
-	}
-	var manifests []Manifest
-	err = json.Unmarshal(manifestBytes, &manifests)
-	if err != nil {
-		panic(err)
-	}
-	if len(manifests) <= 0 {
-		panic("No Manifests found")
-	}
-	manifest := manifests[0]
+var registryBaseUrl = "https://registry-1.docker.io/v2/library/"
 
-	configBytes, err := extractFile(tarPath, manifest.Config)
+func pullImage(imageName string, tag string) (Config, error) {
+	bearerToken := getAuthToken(imageName)
+
+	req, err := http.NewRequest("GET", registryBaseUrl+imageName+"/manifests/"+tag, nil)
 	if err != nil {
-		panic(err)
-	}
-	var imageConfig ImageConfig
-	err = json.Unmarshal(configBytes, &imageConfig)
-	if err != nil {
-		panic(err)
+		return Config{}, err
 	}
 
-	layerBytes, err := extractFile(tarPath, manifest.Layers[0])
+	req.Header.Add("Authorization", "Bearer "+bearerToken)
+
+	client := &http.Client{}
+
+	resp, err := client.Do(req)
 	if err != nil {
-		panic(err)
+		return Config{}, err
+	}
+	defer resp.Body.Close()
+
+	var fatManifests FatManifests
+	if err := json.NewDecoder(resp.Body).Decode(&fatManifests); err != nil {
+		return Config{}, err
+	}
+	arch := runtime.GOARCH
+	var manifestSha string
+	for _, manifest := range fatManifests.Manifests {
+		if manifest.Annotations.Arch == arch {
+			fmt.Printf("Found manifest for arch: %s with digest: %s\n", arch, manifest.Digest)
+			manifestSha = manifest.Digest
+			break
+		}
+	}
+	req.URL.Path = registryBaseUrl + imageName + "/manifests/" + manifestSha
+	resp, err = client.Do(req)
+	if err != nil {
+		return Config{}, err
+	}
+	defer resp.Body.Close()
+	var manifest Manifest
+	if err := json.NewDecoder(resp.Body).Decode(&manifest); err != nil {
+		return Config{}, err
+	}
+
+	req.URL.Path = registryBaseUrl + imageName + "/blobs/" + manifest.Config.Digest
+	resp, err = client.Do(req)
+	if err != nil {
+		return Config{}, err
+	}
+	defer resp.Body.Close()
+	var config ImageConfig
+	if err := json.NewDecoder(resp.Body).Decode(&config); err != nil {
+		return Config{}, err
+	}
+
+	fmt.Printf("Got WorkingDir: %s, Entrypoint: %s, Cmd: %s\n", config.Config.WorkingDir, config.Config.Entrypoint, config.Config.Cmd)
+
+	req.URL.Path = registryBaseUrl + imageName + "/blobs/" + manifest.Layers[0].Digest
+	resp, err = client.Do(req)
+	if err != nil {
+		return Config{}, err
+	}
+	defer resp.Body.Close()
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return Config{}, err
 	}
 	destDir := "./boxy-mcboxface/" + imageName
-	untarLayer(layerBytes, destDir)
+	err = os.Mkdir(destDir, 0755)
+	if err != nil {
+		return Config{}, err
+	}
 
-	return imageConfig.Config, nil
+	untarLayer(bodyBytes, destDir)
+	return config.Config, nil
+}
+
+func getAuthToken(imageName string) string {
+	fmt.Printf("Getting Bearer Token for %s\n", imageName)
+	resp, err := http.Get("https://auth.docker.io/token?service=registry.docker.io&scope=repository:library/" + imageName + ":pull")
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
+	var tokenResp TokenResp
+	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
+		panic(err)
+	}
+	return tokenResp.Token
 }
 
 func untarLayer(layerBytes []byte, destDir string) {
+	fmt.Printf("Extracting Image into %s\n", destDir)
 	byteReader := bytes.NewReader(layerBytes)
 	gzip, err := gzip.NewReader(byteReader)
 	if err != nil {
@@ -143,32 +216,4 @@ func untarLayer(layerBytes []byte, destDir string) {
 		return
 	}
 
-}
-
-func extractFile(path string, target string) ([]byte, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		panic(err)
-	}
-	defer file.Close()
-
-	tarReader := tar.NewReader(file)
-	for {
-		header, err := tarReader.Next()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			panic(err)
-		}
-
-		if filepath.Clean(header.Name) == filepath.Clean(target) {
-			var buf bytes.Buffer
-			if _, err := io.Copy(&buf, tarReader); err != nil {
-				panic(err)
-			}
-			return buf.Bytes(), nil
-		}
-	}
-	return nil, fmt.Errorf("file %s not found in tar archive", target)
 }

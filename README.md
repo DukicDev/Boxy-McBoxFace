@@ -3,12 +3,12 @@
 [![Go Version](https://img.shields.io/github/go-mod/go-version/DukicDev/godoist)](https://golang.org/)  
 [![License](https://img.shields.io/github/license/DukicDev/godoist)](LICENSE)
 
-Boxy-McBoxFace is a hobby project written in Go that explores containerization, OCI images, and Linux isolation techniques. It’s a minimal container runtime that currently supports only Alpine Linux. 
+Boxy-McBoxFace is a hobby project written in Go that explores containerization, OCI images, and Linux isolation techniques. It’s a minimal container runtime that currently only supports 1-layer images.
 
 ## Overview
 
 Boxy-McBoxFace demonstrates how to:
-- Extract an OCI image tarball (generated via `docker save`) to create a container filesystem.
+- Pull the image from the docker registry.
 - Use Linux namespaces and `chroot` to isolate the container.
 - Set up basic cgroup resource limits using [containerd/cgroups](https://github.com/containerd/cgroups).
 - Run a simple container.
@@ -16,24 +16,12 @@ Boxy-McBoxFace demonstrates how to:
 ## Prerequisites
 
 - **Go** (version 1.16 or later is recommended)
-- **Docker** (to pull and save the image)
 - A Linux system with support for namespaces, `chroot`, and cgroups
 
 ## Getting Started
 
-### 1. Save the Alpine Image
 
-Pull the image with Docker and save it locally:
-
-```bash
-docker pull alpine
-docker save alpine -o ./images/alpine.tar
-
-```
-
-Make sure the tarball is saved in the `./images/` directory where you run Boxy-McBoxFace.
-
-### 2. Build Boxy-McBoxFace
+### 1. Build Boxy-McBoxFace
 
 Clone the repository and build the project:
 
@@ -43,7 +31,7 @@ cd boxy-mcboxface
 go build -o boxy-mcboxface .
 ```
 
-### 3. Run the Container
+### 2. Run the Container
 
 Run Boxy-McBoxFace using the following command:
 
@@ -53,15 +41,15 @@ sudo ./boxy-mcboxface run (imageName)
 
 This will:
 - Create a temporary container filesystem under `./boxy-mcboxface/imageName`
-- Extract the OCI image into that directory
+- Pull and extract the OCI image into that directory
 - Set up Linux namespaces, cgroups, and `chroot` into the new filesystem
 - Execute the default command (typically `/bin/sh`) inside the container
 
-### 4. Interact and Exit
+### 3. Interact and Exit
 
 Once the container is running, you should see a shell prompt. You can explore the environment. When you're done, type `exit` to leave the container. Boxy-McBoxFace is designed to clean up the extracted filesystem after the container stops.
 
-### 5. Cleanup
+### 4. Cleanup
 
 If for any reason the cleanup doesn’t occur automatically, you can remove the container filesystem manually:
 
@@ -75,12 +63,11 @@ rm -rf ./boxy-mcboxface
   Contains the main entry point, command-line parsing, and logic for running the container (handling namespaces, cgroups, `chroot`, etc.).
 
 - **imageHandler.go**  
-  Responsible for extracting the OCI image tarball into the container filesystem.
+  Responsible for pulling and extracting the OCI image into the container filesystem.
 
 ## Future Directions
 
-- **Enhanced Features:**  
-  Potential improvements include better networking, storage options, more advanced resource management, and robust error handling.
+- Support multi-layer images
 
 ## License
 

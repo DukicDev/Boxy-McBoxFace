@@ -52,11 +52,7 @@ func child() {
 	image := os.Args[2]
 	destDir := baseDir + image
 
-	err := os.MkdirAll(destDir, 0755)
-	if err != nil {
-		panic(err)
-	}
-	imageConfig, err := ExtractImage(image)
+	imageConfig, err := pullImage(image, "latest")
 	if err != nil {
 		panic(err)
 	}
@@ -115,7 +111,6 @@ func child() {
 		panic(err)
 	}
 }
-
 func cg() {
 	shares := uint64(50)
 	memLimit := int64(100 * 1024 * 1024)
