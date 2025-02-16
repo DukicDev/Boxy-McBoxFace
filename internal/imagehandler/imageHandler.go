@@ -1,4 +1,4 @@
-package main
+package imagehandler
 
 import (
 	"archive/tar"
@@ -43,7 +43,7 @@ type Config struct {
 	Env        []string `json:"Env"`
 }
 
-func (c *Config) getEnvMap() map[string]string {
+func (c *Config) GetEnvMap() map[string]string {
 	envMap := make(map[string]string)
 	for _, env := range c.Env {
 		parts := strings.SplitN(env, "=", 2)
@@ -58,7 +58,7 @@ type TokenResp struct {
 
 var registryBaseUrl = "https://registry-1.docker.io/v2/library/"
 
-func pullImage(imageName string, tag string) (Config, error) {
+func PullImage(imageName string, tag string) (Config, error) {
 	bearerToken := getAuthToken(imageName)
 
 	req, err := http.NewRequest("GET", registryBaseUrl+imageName+"/manifests/"+tag, nil)

@@ -10,6 +10,8 @@ import (
 
 	"github.com/containerd/cgroups/v3/cgroup1"
 	"github.com/opencontainers/runtime-spec/specs-go"
+
+	"github.com/DukicDev/Boxy-McBoxFace/internal/imagehandler"
 )
 
 var baseDir = "/var/lib/boxy-mcboxface/containers/"
@@ -55,7 +57,7 @@ func child() {
 	image := os.Args[2]
 	destDir := baseDir + image
 
-	imageConfig, err := pullImage(image, "latest")
+	imageConfig, err := imagehandler.PullImage(image, "latest")
 	if err != nil {
 		panic(err)
 	}
@@ -100,7 +102,7 @@ func child() {
 		panic(err)
 	}
 
-	for key, env := range imageConfig.getEnvMap() {
+	for key, env := range imageConfig.GetEnvMap() {
 		os.Setenv(key, env)
 	}
 
@@ -152,7 +154,7 @@ func cg() {
 
 }
 
-func getImageCmd(imageConfig Config) []string {
+func getImageCmd(imageConfig imagehandler.Config) []string {
 	var cmd []string
 	if len(imageConfig.Entrypoint) > 0 {
 		cmd = append(imageConfig.Entrypoint, imageConfig.Cmd...)
