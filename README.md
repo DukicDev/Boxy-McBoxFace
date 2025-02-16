@@ -26,9 +26,9 @@ Boxy-McBoxFace demonstrates how to:
 Clone the repository and build the project:
 
 ```bash
-git clone https://github.com/DukicDev/boxy-mcboxface.git
-cd boxy-mcboxface
-go build -o boxy-mcboxface .
+git clone https://github.com/DukicDev/Boxy-McBoxFace.git
+cd Boxy-McBoxFace
+go build -o Boxy-McBoxFace ./cmd
 ```
 
 ### 2. Run the Container
@@ -36,7 +36,7 @@ go build -o boxy-mcboxface .
 Run Boxy-McBoxFace using the following command:
 
 ```bash
-sudo ./boxy-mcboxface run (imageName) (cmd)
+sudo ./Boxy-McBoxFace run (imageName) (cmd)
 ```
 
 This will:
@@ -57,10 +57,10 @@ If for any reason the cleanup doesn’t occur automatically, you can remove the 
 
 ## Project Structure
 
-- **main.go:**  
+- **cmd/main.go:**  
   Contains the main entry point, command-line parsing, and logic for running the container (handling namespaces, cgroups, `chroot`, etc.).
 
-- **imageHandler.go**  
+- **internal/imagehandler/imageHandler.go**  
   Responsible for pulling and extracting the OCI image into the container filesystem.
 
 ## License
